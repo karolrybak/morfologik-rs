@@ -1,0 +1,8 @@
+[package]
+name = "morfologik-fsa-builders"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+morfologik-fsa = { path = "../morfologik-fsa" }
+# Dodaj inne zależności

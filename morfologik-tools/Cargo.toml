@@ -1,0 +1,15 @@
+[package]
+name = "morfologik-tools"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "morfologik-cli" # Nazwa pliku wykonywalnego
+path = "src/main.rs"
+
+[dependencies]
+morfologik-fsa = { path = "../crates/morfologik-fsa" }
+morfologik-fsa-builders = { path = "../crates/morfologik-fsa-builders" }
+morfologik-stemming = { path = "../crates/morfologik-stemming" }
+# clap = { version = "4.0", features = ["derive"] } # Do parsowania argumentów CLI
+# Dodaj inne zależności

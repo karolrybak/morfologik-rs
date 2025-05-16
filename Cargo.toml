@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/morfologik-fsa",
+    "crates/morfologik-fsa-builders", 
+    "crates/morfologik-stemming",
+    "crates/morfologik-polish",
+    # "crates/morfologik-speller",  # Opcjonalny
+    "morfologik-tools",
+]
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 'z' 
+strip = true
+panic = 'abort'

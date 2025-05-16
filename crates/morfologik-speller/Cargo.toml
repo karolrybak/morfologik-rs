@@ -1,0 +1,8 @@
+[package]
+name = "morfologik-speller"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+morfologik-stemming = { path = "../morfologik-stemming" }
+# Dodaj inne zależności

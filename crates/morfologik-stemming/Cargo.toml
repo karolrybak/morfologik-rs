@@ -1,0 +1,12 @@
+[package]
+name = "morfologik-stemming"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+morfologik-fsa = { path = "../morfologik-fsa" }
+thiserror = "1.0.58" # Już powinno być dla error.rs
+
+[dev-dependencies]
+tempfile = "3.10.1"
+assert_matches = "1.5.0" # Dodajemy assert_matches

@@ -1,0 +1,9 @@
+[package]
+name = "morfologik-polish"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+morfologik-stemming = { path = "../morfologik-stemming" }
+morfologik-fsa = { path = "../morfologik-fsa" }
+tempfile = "3.3.0"
