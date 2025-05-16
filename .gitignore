@@ -1,0 +1,11 @@
+.direnv
+.envrc
+aidb
+assets/*.*
+assets/fonts
+assets/models
+assets/music
+assets/sounds
+dbg
+target
+Cargo.lock

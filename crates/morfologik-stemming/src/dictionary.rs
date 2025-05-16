@@ -5,16 +5,17 @@ use std::io::{BufReader, Cursor, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::Arc; 
 
-// morfologik_fsa::fsa_trait::Fsa jest używane w typie Box<dyn Fsa...>
+use morfologik_fsa::fsa_trait::Fsa;
 use morfologik_fsa::fsa5::FSA5;
 use morfologik_fsa::cfsa2::CFSA2;
+// Używamy poprawnych stałych wersji
 use morfologik_fsa::fsa_header::{VERSION_FSA5, VERSION_CFSA2, FsaHeader};
 use morfologik_fsa::error::FsaError;
 
 
-use crate::dictionary_metadata::{DictionaryMetadata, EncoderType}; // DictionaryAttribute nie jest tu bezpośrednio używane
+use crate::dictionary_metadata::{DictionaryMetadata, EncoderType, DictionaryAttribute};
 use crate::encoders::{
-    NoEncoder, TrimPrefixEncoder, TrimSuffixEncoder, // TrimPrefixAndSuffixEncoder nie jest tu bezpośrednio używane
+    NoEncoder, TrimPrefixEncoder, TrimPrefixAndSuffixEncoder, TrimSuffixEncoder,
     TrimInfixAndSuffixEncoder,
 };
 use crate::sequence_encoder_trait::SequenceEncoder;
@@ -23,7 +24,7 @@ use crate::error::{Result as StemmingResult, StemmingError};
 /// Reprezentuje słownik morfologiczny.
 #[derive(Debug, Clone)] 
 pub struct Dictionary {
-    pub fsa: Arc<Box<dyn morfologik_fsa::fsa_trait::Fsa + Send + Sync>>, // Użycie pełnej ścieżki dla jasności
+    pub fsa: Arc<Box<dyn Fsa + Send + Sync>>, 
     pub metadata: Arc<DictionaryMetadata>, 
     pub encoder: Arc<Box<dyn SequenceEncoder + Send + Sync>>, 
 }
@@ -62,9 +63,14 @@ impl Dictionary {
         
         reader.seek(SeekFrom::Start(original_pos)).map_err(|e| StemmingError::Io(e.to_string()))?;
 
-        let fsa_instance: Box<dyn morfologik_fsa::fsa_trait::Fsa + Send + Sync> = match fsa_header_for_check.version {
+        let fsa_instance: Box<dyn Fsa + Send + Sync> = match fsa_header_for_check.version {
             VERSION_FSA5 => Box::new(FSA5::from_reader(reader).map_err(StemmingError::Fsa)?),
-            VERSION_CFSA2 => Box::new(CFSA2::from_reader(reader).map_err(StemmingError::Fsa)?),
+            // Teraz VERSION_CFSA2 to 0xC6
+            VERSION_CFSA2 => {
+                println!("[Dictionary::from_readers] Wykryto wersję CFSA2 (0xC6).");
+                Box::new(CFSA2::from_reader(reader).map_err(StemmingError::Fsa)?)
+            }
+            // Usunięto gałąź dla VERSION_CFSA_LEGACY, ponieważ jest to teraz VERSION_CFSA2
             ver => return Err(StemmingError::Fsa(FsaError::UnsupportedVersion(ver))),
         };
         
@@ -78,7 +84,6 @@ impl Dictionary {
             EncoderType::Suffix => Box::new(TrimSuffixEncoder::new(separator as u8)),
             EncoderType::Prefix => Box::new(TrimPrefixEncoder::new(separator as u8)),
             EncoderType::Infix => Box::new(TrimInfixAndSuffixEncoder::new(separator as u8)),
-            // Jeśli TrimPrefixAndSuffixEncoder miałby być mapowany z innego EncoderType, dodaj tutaj.
         };
         let arc_encoder = Arc::new(sequence_encoder);
 
@@ -128,16 +133,20 @@ mod tests {
         data
     }
     
+    // Ta funkcja teraz tworzy poprawny nagłówek dla CFSA2 (wersja 0xC6)
     fn create_test_cfsa2_dict_bytes() -> Vec<u8> {
         let mut data = Vec::new();
         data.extend_from_slice(&FSA_MAGIC);
-        data.extend_from_slice(&[VERSION_CFSA2]); 
+        data.extend_from_slice(&[VERSION_CFSA2]); // Używa poprawionej VERSION_CFSA2 = 0xC6
         let fsa_flags_val = morfologik_fsa::fsa_header::FsaFlags::empty().bits();
         let gtl_info_val = 0u8; 
         let automaton_flags_short = (fsa_flags_val & 0x00FF) | ((gtl_info_val as u16) << 8);
         data.extend_from_slice(&automaton_flags_short.to_le_bytes());
         data
     }
+    
+    // Usunięto create_test_cfsa_legacy_dict_bytes, ponieważ jest to teraz create_test_cfsa2_dict_bytes
+
 
      fn create_test_info_file(content: &str) -> NamedTempFile {
         let mut temp_file = NamedTempFile::new().unwrap();
@@ -175,7 +184,8 @@ mod tests {
 
     #[test]
     fn test_dictionary_from_embedded_cfsa2_suffix_encoder() -> StemmingResult<()> {
-        let info_content_str = create_test_info_file_content('|', EncoderType::Suffix, "CFSA2");
+        // Ten test teraz używa create_test_cfsa2_dict_bytes, które generuje nagłówek z wersją 0xC6
+        let info_content_str = create_test_info_file_content('|', EncoderType::Suffix, "CFSA2"); // .info może nadal mówić CFSA2
         let dict_bytes_vec = create_test_cfsa2_dict_bytes();
         let info_bytes_vec = info_content_str.into_bytes(); 
         
@@ -187,6 +197,9 @@ mod tests {
         assert_eq!(dict.fsa.get_root_node(), 0);
         Ok(())
     }
+
+    // Usunięto test test_dictionary_from_embedded_cfsa_legacy, ponieważ jest on teraz pokryty przez
+    // test_dictionary_from_embedded_cfsa2_suffix_encoder z poprawną wersją.
 
 
     #[test]
@@ -212,7 +225,7 @@ mod tests {
         let info_content = create_test_info_file_content('|', EncoderType::Suffix, "CFSA2");
         let info_file = create_test_info_file(&info_content);
         let dict_path = info_file.path().with_extension("dict");
-        create_test_cfsa2_dict_file(&dict_path);
+        create_test_cfsa2_dict_file(&dict_path); // Tworzy plik z wersją 0xC6
 
         let dict = Dictionary::from_file(&dict_path)?;
 
@@ -252,7 +265,7 @@ mod tests {
         
         let mut file_v3 = File::create(&dict_path_v3).unwrap();
         file_v3.write_all(&FSA_MAGIC).unwrap();
-        file_v3.write_all(&[3]).unwrap(); 
+        file_v3.write_all(&[3]).unwrap(); // Wersja 3, której nie obsługujemy
         file_v3.write_all(&[1,1,0,0]).unwrap(); 
         file_v3.flush().unwrap();
 
